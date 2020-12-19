@@ -43,7 +43,8 @@ jobs:
       run: |
         conda info
         conda list
-    - shell: bash -l {0}
+    - name: Install conda dependencies
+      shell: bash -l {0}
       run: |
         conda install -c conda-forge root pyarrow
         conda install pytest

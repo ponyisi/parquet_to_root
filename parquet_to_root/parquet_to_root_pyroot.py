@@ -41,7 +41,7 @@ def _setup_branch_scalar(field, tree, numpybufs, stringvars):
         s0 = ROOT.std.string()
         tree.Branch(field.name, s0)
     else:
-        _check_type_in_map(field.type, 
+        _check_type_in_map(field.type,
                            f'Field {field.name} has type "{field.type}" that is not supported')
         numpybufs[field.name] = numpy.zeros(shape=[1], dtype=field.type.to_pandas_dtype())
         tree.Branch(field.name, numpybufs[field.name], field.name+'/'+_dtypemap[field.type])
@@ -68,12 +68,34 @@ def _setup_branch_list(field, tree, vectorlens, stringarrs):
                     f'{field.name}[{field.name}_parquet_n]/{_dtypemap[field.type.value_type]}')
 
 
+def _do_fill(tree, entry, table, numpybufs, stringvars, vectorlens, stringarrs):
+    import ROOT
+    ptrs = []
+    for branch in numpybufs:
+        numpybufs[branch][0] = table[branch][entry].as_py()
+    for branch in stringvars:
+        s0 = ROOT.std.string(table[branch][entry].as_py())
+        tree.SetBranchAddress(branch, s0)
+        ptrs.append(s0)
+    for branch in vectorlens:
+        values_arrow = table[branch][entry]
+        vectorlens[branch][0] = len(values_arrow)
+        # Booleans don't work with zero copy but everything else should
+        values = values_arrow.values.to_numpy(zero_copy_only=False)
+        ptrs.append(values)
+        tree.SetBranchAddress(branch, values)
+    for branch, vec in stringarrs.items():
+        vec.clear()
+        for string in table[branch][entry].as_py():
+            vec.push_back(string)
+    tree.Fill()
+
+
 def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
                            verbose=False):
     import pyarrow.parquet as pq
     import pyarrow
     import ROOT
-    import numpy
 
     # Use parquet metadata for schema
     table = pq.read_table(infile)
@@ -109,25 +131,7 @@ def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
     # Fill loop
     for entry in range(len(table)):
         # trash on every pass through loop; just here to make sure nothing gets garbage collected early
-        ptrs = set()
-        for branch in numpybufs:
-            numpybufs[branch][0] = table[branch][entry].as_py()
-        for branch in stringvars:
-            s0 = ROOT.std.string(table[branch][entry].as_py())
-            tree.SetBranchAddress(branch, s0)
-            ptrs.add(s0)
-        for branch in vectorlens:
-            values_arrow = table[branch][entry]
-            vectorlens[branch][0] = len(values_arrow)
-            # Booleans don't work with zero copy but everything else should
-            values = values_arrow.values.to_numpy(zero_copy_only=False)
-            tree.SetBranchAddress(branch, values)
-        for branch, vec in stringarrs.items():
-            vec.clear()
-            for string in table[branch][entry].as_py():
-                vec.push_back(string)
-
-        tree.Fill()
+        _do_fill(tree, entry, table, numpybufs, stringvars, vectorlens, stringarrs)
 
     tree.Write()
     if local_root_file_creation:
