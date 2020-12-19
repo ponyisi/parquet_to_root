@@ -16,15 +16,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v2
+    - uses: conda-incubator/setup-miniconda@v2
       with:
+        activate-environment: test
+        environment-file: environment.yml
         python-version: 3.8
-    - name: Install dependencies
+        auto-activate-base: false
+    - shell: bash -l {0}
       run: |
-        $CONDA/bin/conda env update --file environment.yml --name base
+        conda info
+        conda list
     - name: Test with pytest
       run: |
         conda install -c conda-forge root
         conda install pytest
-        $CONDA/bin/pytest
+        pytest
