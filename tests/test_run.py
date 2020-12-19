@@ -1,8 +1,6 @@
-def test_run():
-    try:
-        import ROOT  # noqa: F401
-    except ImportError:
-        print("ROOT not available, aborting test")
-        return True
+import pytest
+ROOT = pytest.importorskip("ROOT")
 
+def test_run():
+    ROOT.TFile
     return True
