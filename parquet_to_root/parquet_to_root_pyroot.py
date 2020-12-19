@@ -64,9 +64,10 @@ def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
             # lists of a single type
             _check_type_in_map(field.type.value_type, dtypemap,
                                f'Field {field.name} is array of type "{field.type.value_type}" that is not supported')
-            # Apache Arrow spec allows array lengths to be *signed* 64 bit integers
-            vectorlens[branch] = numpy.zeros(shape=[1], dtype='int64')
-            tree.Branch(f'{branch}_parquet_n', vectorlens[branch], f'{branch}_parquet_n/L')
+            # Apache Arrow spec allows array lengths to be *signed* 64 bit integers,
+            # but ROOT tends to complain (e.g. RDataFrame) if array lengths are longer than 32 bits
+            vectorlens[branch] = numpy.zeros(shape=[1], dtype='int32')
+            tree.Branch(f'{branch}_parquet_n', vectorlens[branch], f'{branch}_parquet_n/I')
             # temp array for initialization
             v0 = numpy.zeros(shape=[1], dtype=field.type.value_type.to_pandas_dtype())
             tree.Branch(branch, v0,
