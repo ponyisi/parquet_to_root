@@ -1,7 +1,7 @@
 import pytest
-ROOT = pytest.importorskip("ROOT")
 
 def test_run():
+    ROOT = pytest.importorskip("ROOT")
     ROOT.TFile
     return True
 
