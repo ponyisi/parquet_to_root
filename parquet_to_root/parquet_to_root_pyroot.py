@@ -1,4 +1,5 @@
 def _get_outfile(outfile):
+    import ROOT
     if isinstance(outfile, ROOT.TFile):
         outfile.cd()
         return outfile, False
