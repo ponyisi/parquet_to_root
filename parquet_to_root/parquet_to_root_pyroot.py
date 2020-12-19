@@ -13,9 +13,59 @@ def _printout(verbose, msg):
         print(msg)
 
 
-def _check_type_in_map(dtype, dtypemap, msg):
-    if dtype not in dtypemap:
+_dtypemap = {'int8': 'B',
+             'uint8': 'b',
+             'int16': 'S',
+             'uint16': 's',
+             'int32': 'I',
+             'uint32': 'i',
+             'float': 'F',
+             'halffloat': 'f',
+             'double': 'D',
+             'int64': 'L',
+             'uint64': 'l',
+             'bool': 'O'}
+
+
+def _check_type_in_map(dtype, msg):
+    if dtype not in _dtypemap:
         raise ValueError(msg)
+
+
+def _setup_branch_scalar(field, tree, numpybufs, stringvars):
+    import numpy
+    import ROOT
+    if field.type == 'string':
+        stringvars.add(field.name)
+        # dummy string
+        s0 = ROOT.std.string()
+        tree.Branch(field.name, s0)
+    else:
+        _check_type_in_map(field.type, 
+                           f'Field {field.name} has type "{field.type}" that is not supported')
+        numpybufs[field.name] = numpy.zeros(shape=[1], dtype=field.type.to_pandas_dtype())
+        tree.Branch(field.name, numpybufs[field.name], field.name+'/'+_dtypemap[field.type])
+
+
+def _setup_branch_list(field, tree, vectorlens, stringarrs):
+    import numpy
+    import ROOT
+    if field.type.value_type == 'string':
+        # vector of strings
+        sv0 = ROOT.std.vector(ROOT.std.string)()
+        stringarrs[field.name] = sv0
+        tree.Branch(field.name, sv0)
+    else:
+        _check_type_in_map(field.type.value_type,
+                           f'Field {field.name} is array of type "{field.type.value_type}" that is not supported')
+        # Apache Arrow spec allows array lengths to be *signed* 64 bit integers,
+        # but ROOT tends to complain (e.g. RDataFrame) if array lengths are longer than 32 bits
+        vectorlens[field.name] = numpy.zeros(shape=[1], dtype='int32')
+        tree.Branch(f'{field.name}_parquet_n', vectorlens[field.name], f'{field.name}_parquet_n/I')
+        # temp array for initialization
+        v0 = numpy.zeros(shape=[1], dtype=field.type.value_type.to_pandas_dtype())
+        tree.Branch(field.name, v0,
+                    f'{field.name}[{field.name}_parquet_n]/{_dtypemap[field.type.value_type]}')
 
 
 def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
@@ -32,23 +82,16 @@ def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
     fout, local_root_file_creation = _get_outfile(outfile)
     tree = ROOT.TTree(treename, 'Parquet tree')
 
-    dtypemap = {'int8': 'B',
-                'uint8': 'b',
-                'int16': 'S',
-                'uint16': 's',
-                'int32': 'I',
-                'uint32': 'i',
-                'float': 'F',
-                'halffloat': 'f',
-                'double': 'D',
-                'int64': 'L',
-                'uint64': 'l',
-                'bool': 'O'}
-
     # Buffers for primitive types
     numpybufs = {}
     # Buffers for lengths of list types
     vectorlens = {}
+
+    # Strings need to be treated differently due to memory layout
+    # These variables are strings
+    stringvars = set()
+    # Vectors of strings
+    stringarrs = {}
 
     _printout(verbose, 'Translating branches:')
     for branch in schema.names:
@@ -56,35 +99,33 @@ def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
         _printout(verbose, f'{field.name}, {field.type}')
         if field.type.num_fields == 0:
             # primitive types
-            _check_type_in_map(field.type, dtypemap,
-                               f'Field {field.name} has type "{field.type}" that is not supported')
-            numpybufs[branch] = numpy.zeros(shape=[1], dtype=field.type.to_pandas_dtype())
-            tree.Branch(branch, numpybufs[branch], branch+'/'+dtypemap[field.type])
+            _setup_branch_scalar(field, tree, numpybufs, stringvars)
         elif field.type.num_fields == 1 and isinstance(field.type, pyarrow.lib.ListType):
             # lists of a single type
-            _check_type_in_map(field.type.value_type, dtypemap,
-                               f'Field {field.name} is array of type "{field.type.value_type}" that is not supported')
-            # Apache Arrow spec allows array lengths to be *signed* 64 bit integers,
-            # but ROOT tends to complain (e.g. RDataFrame) if array lengths are longer than 32 bits
-            vectorlens[branch] = numpy.zeros(shape=[1], dtype='int32')
-            tree.Branch(f'{branch}_parquet_n', vectorlens[branch], f'{branch}_parquet_n/I')
-            # temp array for initialization
-            v0 = numpy.zeros(shape=[1], dtype=field.type.value_type.to_pandas_dtype())
-            tree.Branch(branch, v0,
-                        f'{branch}[{branch}_parquet_n]/{dtypemap[field.type.value_type]}')
+            _setup_branch_list(field, tree, vectorlens, stringarrs)
         else:
             raise ValueError(f'Cannot translate field "{branch}" of input Parquet schema. Field is described as {field.type}')
 
     # Fill loop
     for entry in range(len(table)):
+        # trash on every pass through loop; just here to make sure nothing gets garbage collected early
+        ptrs = set()
         for branch in numpybufs:
             numpybufs[branch][0] = table[branch][entry].as_py()
+        for branch in stringvars:
+            s0 = ROOT.std.string(table[branch][entry].as_py())
+            tree.SetBranchAddress(branch, s0)
+            ptrs.add(s0)
         for branch in vectorlens:
             values_arrow = table[branch][entry]
             vectorlens[branch][0] = len(values_arrow)
             # Booleans don't work with zero copy but everything else should
             values = values_arrow.values.to_numpy(zero_copy_only=False)
             tree.SetBranchAddress(branch, values)
+        for branch, vec in stringarrs.items():
+            vec.clear()
+            for string in table[branch][entry].as_py():
+                vec.push_back(string)
 
         tree.Fill()
 

@@ -25,3 +25,27 @@ def test_cmdline():
     t = rf.Get('newtree')
     assert t.GetEntries() == 2421
     return True
+
+
+def test_run_with_strings():
+    from parquet_to_root import parquet_to_root
+    ROOT = pytest.importorskip("ROOT")
+    parquet_to_root('tests/samples/exoplanets.parquet', 'exoplanets.root', treename='stars')
+    rf = ROOT.TFile.Open('exoplanets.root')
+    t = rf.Get('stars')
+    t.GetEntry(8)
+    assert t.name == '24 Sex'
+    assert list(t.planet_name) == ['b', 'c']
+    return True
+
+
+def test_run_with_fileobj():
+    from parquet_to_root import parquet_to_root
+    ROOT = pytest.importorskip("ROOT")
+    inf = open('tests/samples/HZZ.parquet', 'rb')
+    outf = ROOT.TFile.Open('HZZ.root', 'RECREATE')
+    parquet_to_root(inf, outf, verbose=True)
+    outf.Close()
+    rdf = ROOT.RDataFrame('parquettree', 'HZZ.root')
+    assert rdf.Count().GetValue() == 2421
+    return True
