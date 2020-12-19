@@ -1,6 +1,4 @@
 from . import parquet_to_root
-import sys
-import os
 import argparse
 
 parser = argparse.ArgumentParser()

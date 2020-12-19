@@ -4,7 +4,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="parquet_to_root", # Replace with your own username
+    name="parquet_to_root",
     version="0.1.0",
     author="Peter Onyisi",
     author_email="ponyisi@utexas.edu",

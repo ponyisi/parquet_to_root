@@ -5,9 +5,6 @@ def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
     import ROOT
     import numpy
 
-    import sys
-    import os
-
     # Use parquet metadata for schema
     table = pq.read_table(infile)
     schema = table.schema
@@ -75,12 +72,13 @@ def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
             # Booleans don't work with zero copy but everything else should
             values = values_arrow.values.to_numpy(zero_copy_only=False)
             tree.SetBranchAddress(branch, values)
-            
+
         tree.Fill()
 
     tree.Write()
     if local_root_file_creation:
         fout.Close()
+
 
 if __name__ == '__main__':
     import sys
