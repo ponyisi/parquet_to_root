@@ -1,4 +1,13 @@
-def parquet_to_root_pyroot(infile, outfile, treename='parquettree', 
+def _get_outfile(outfile):
+    if isinstance(outfile, ROOT.TFile):
+        outfile.cd()
+        return outfile, False
+    else:
+        fout = ROOT.TFile.Open(outfile, 'RECREATE')
+        return fout, True
+
+
+def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
                            verbose=False):
     import pyarrow.parquet as pq
     import pyarrow
@@ -9,13 +18,7 @@ def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
     table = pq.read_table(infile)
     schema = table.schema
 
-    if isinstance(outfile, ROOT.TFile):
-        fout = outfile
-        fout.cd()
-        local_root_file_creation = False
-    else:
-        fout = ROOT.TFile.Open(outfile, 'RECREATE')
-        local_root_file_creation = True
+    fout, local_root_file_creation = _get_outfile(outfile)
     tree = ROOT.TTree(treename, 'Parquet tree')
 
     dtypemap = {'int8': 'B',
@@ -57,7 +60,7 @@ def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
             tree.Branch(f'{branch}_parquet_n', vectorlens[branch], f'{branch}_parquet_n/L')
             # temp array for initialization
             v0 = numpy.zeros(shape=[1], dtype=field.type.value_type.to_pandas_dtype())
-            tree.Branch(branch, v0, 
+            tree.Branch(branch, v0,
                         f'{branch}[{branch}_parquet_n]/{dtypemap[field.type.value_type]}')
         else:
             raise ValueError(f'Cannot translate field "{branch}" of input Parquet schema. Field is described as {field.type}')
