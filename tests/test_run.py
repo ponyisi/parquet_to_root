@@ -49,3 +49,18 @@ def test_run_with_fileobj():
     rdf = ROOT.RDataFrame('parquettree', 'HZZ.root')
     assert rdf.Count().GetValue() == 2421
     return True
+
+
+def test_run_with_existing_rootfile():
+    from parquet_to_root import parquet_to_root
+    ROOT = pytest.importorskip("ROOT")
+    parquet_to_root('tests/samples/HZZ.parquet', 'combined.root', treename='HZZ', verbose=True)
+    outf = ROOT.TFile.Open('combined.root', 'UPDATE')
+    parquet_to_root('tests/samples/exoplanets.parquet', outf, treename='stars', verbose=True)
+    outf.Close()
+    rf = ROOT.TFile.Open('combined.root')
+    t1 = rf.Get('HZZ')
+    assert t1.GetEntries() == 2421
+    t2 = rf.Get('stars')
+    assert t2.GetEntries() == 2935
+    return True
