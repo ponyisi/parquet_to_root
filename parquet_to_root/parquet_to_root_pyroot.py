@@ -8,6 +8,16 @@ def _get_outfile(outfile):
         return fout, True
 
 
+def _printout(verbose, msg):
+    if verbose:
+        print(msg)
+
+
+def _check_type_in_map(dtype, dtypemap, msg):
+    if dtype not in dtypemap:
+        raise ValueError(msg)
+
+
 def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
                            verbose=False):
     import pyarrow.parquet as pq
@@ -40,22 +50,20 @@ def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
     # Buffers for lengths of list types
     vectorlens = {}
 
-    if verbose:
-        print('Translating branches:')
+    _printout(verbose, 'Translating branches:')
     for branch in schema.names:
         field = schema.field(branch)
-        if verbose:
-            print(field.name, field.type)
+        _printout(verbose, f'{field.name}, {field.type}')
         if field.type.num_fields == 0:
             # primitive types
-            if field.type not in dtypemap:
-                raise ValueError(f'Field {field.name} has type "{field.type}" that is not supported')
+            _check_type_in_map(field.type, dtypemap,
+                               f'Field {field.name} has type "{field.type}" that is not supported')
             numpybufs[branch] = numpy.zeros(shape=[1], dtype=field.type.to_pandas_dtype())
             tree.Branch(branch, numpybufs[branch], branch+'/'+dtypemap[field.type])
         elif field.type.num_fields == 1 and isinstance(field.type, pyarrow.lib.ListType):
             # lists of a single type
-            if field.type.value_type not in dtypemap:
-                raise ValueError(f'Field {field.name} is array of type "{field.type.value_type}" that is not supported')
+            _check_type_in_map(field.type.value_type, dtypemap,
+                               f'Field {field.name} is array of type "{field.type.value_type}" that is not supported')
             # Apache Arrow spec allows array lengths to be *signed* 64 bit integers
             vectorlens[branch] = numpy.zeros(shape=[1], dtype='int64')
             tree.Branch(f'{branch}_parquet_n', vectorlens[branch], f'{branch}_parquet_n/L')
