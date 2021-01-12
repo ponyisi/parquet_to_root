@@ -112,7 +112,7 @@ def normalize_parquet(infiles):
         if schema != schema2:
             raise ValueError(f"Mismatched Parquet schemas between {infiles[0]} and {f}")
 
-    return lfiles, schema    
+    return lfiles, schema
 
 
 def parquet_to_root_pyroot(infiles, outfile, treename='parquettree',

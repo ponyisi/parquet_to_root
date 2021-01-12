@@ -69,8 +69,8 @@ def test_run_with_existing_rootfile():
 def test_run_with_multiple_inputs():
     from parquet_to_root import parquet_to_root
     ROOT = pytest.importorskip("ROOT")
-    parquet_to_root(['tests/samples/HZZ.parquet','tests/samples/HZZ.parquet'],
-                     'HZZ.root', verbose=True)
+    parquet_to_root(['tests/samples/HZZ.parquet', 'tests/samples/HZZ.parquet'],
+                    'HZZ.root', verbose=True)
     rdf = ROOT.RDataFrame('parquettree', 'HZZ.root')
     assert rdf.Count().GetValue() == 4842
     assert rdf.GetColumnNames().size() == 74
@@ -81,10 +81,9 @@ def test_run_with_multiple_inputs():
 
 def test_fail_on_incompatible_inputs():
     from parquet_to_root import parquet_to_root
-    ROOT = pytest.importorskip("ROOT")
     with pytest.raises(ValueError):
-        parquet_to_root(['tests/samples/HZZ.parquet','tests/samples/exoplanets.parquet'], 
-                         'HZZ.root', verbose=True)
+        parquet_to_root(['tests/samples/HZZ.parquet', 'tests/samples/exoplanets.parquet'],
+                        'HZZ.root', verbose=True)
 
 
 def test_cmdline_multiple_inputs():
@@ -102,9 +101,9 @@ def test_cmdline_multiple_inputs():
 
 
 def test_cmdline_incompatible_inputs():
-    ROOT = pytest.importorskip("ROOT")
     import subprocess
-    chk = subprocess.run("python3 -m parquet_to_root tests/samples/HZZ.parquet tests/samples/exoplanets.parquet HZZ.root -t newtree",
+    chk = subprocess.run("python3 -m parquet_to_root tests/samples/HZZ.parquet tests/samples/exoplanets.parquet " \
+                         "HZZ.root -t newtree",
                          shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     print(chk.stdout)
     with pytest.raises(subprocess.CalledProcessError):
