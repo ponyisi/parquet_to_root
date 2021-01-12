@@ -102,7 +102,7 @@ def test_cmdline_multiple_inputs():
 
 def test_cmdline_incompatible_inputs():
     import subprocess
-    chk = subprocess.run("python3 -m parquet_to_root tests/samples/HZZ.parquet tests/samples/exoplanets.parquet " \
+    chk = subprocess.run("python3 -m parquet_to_root tests/samples/HZZ.parquet tests/samples/exoplanets.parquet "
                          "HZZ.root -t newtree",
                          shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     print(chk.stdout)
