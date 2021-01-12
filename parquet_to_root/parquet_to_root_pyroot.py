@@ -91,15 +91,38 @@ def _do_fill(tree, entry, table, numpybufs, stringvars, vectorlens, stringarrs):
     tree.Fill()
 
 
-def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
+def normalize_parquet(infiles):
+    '''Convert infiles argument to list; verify schema match across all files'''
+    import pyarrow.parquet as pq
+    import io
+
+    # convert to a list
+    if isinstance(infiles, str) or isinstance(infiles, io.IOBase):
+        lfiles = [infiles]
+    else:
+        try:
+            lfiles = list(infiles)
+        except TypeError:
+            # This really shouldn't be hit, but maybe there's an edge case
+            lfiles = [infiles]
+
+    schema = pq.read_schema(lfiles[0])
+    for f in lfiles[1:]:
+        schema2 = pq.read_schema(f)
+        if schema != schema2:
+            raise ValueError(f"Mismatched Parquet schemas between {infiles[0]} and {f}")
+
+    return lfiles, schema    
+
+
+def parquet_to_root_pyroot(infiles, outfile, treename='parquettree',
                            verbose=False):
     import pyarrow.parquet as pq
     import pyarrow
     import ROOT
 
-    # Use parquet metadata for schema
-    table = pq.read_table(infile)
-    schema = table.schema
+    # Interpret files
+    infiles, schema = normalize_parquet(infiles)
 
     fout, local_root_file_creation = _get_outfile(outfile)
     tree = ROOT.TTree(treename, 'Parquet tree')
@@ -129,9 +152,11 @@ def parquet_to_root_pyroot(infile, outfile, treename='parquettree',
             raise ValueError(f'Cannot translate field "{branch}" of input Parquet schema. Field is described as {field.type}')
 
     # Fill loop
-    for entry in range(len(table)):
-        # trash on every pass through loop; just here to make sure nothing gets garbage collected early
-        _do_fill(tree, entry, table, numpybufs, stringvars, vectorlens, stringarrs)
+    for infile in infiles:
+        table = pq.read_table(infile)
+        for entry in range(len(table)):
+            # trash on every pass through loop; just here to make sure nothing gets garbage collected early
+            _do_fill(tree, entry, table, numpybufs, stringvars, vectorlens, stringarrs)
 
     tree.Write()
     if local_root_file_creation:

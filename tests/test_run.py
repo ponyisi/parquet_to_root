@@ -64,3 +64,50 @@ def test_run_with_existing_rootfile():
     t2 = rf.Get('stars')
     assert t2.GetEntries() == 2935
     return True
+
+
+def test_run_with_multiple_inputs():
+    from parquet_to_root import parquet_to_root
+    ROOT = pytest.importorskip("ROOT")
+    parquet_to_root(['tests/samples/HZZ.parquet','tests/samples/HZZ.parquet'],
+                     'HZZ.root', verbose=True)
+    rdf = ROOT.RDataFrame('parquettree', 'HZZ.root')
+    assert rdf.Count().GetValue() == 4842
+    assert rdf.GetColumnNames().size() == 74
+    assert rdf.Mean("Muon_Px").GetValue() == -0.6551689155476192
+    assert rdf.Mean("MET_px").GetValue() == 0.23863275654291605
+    return True
+
+
+def test_fail_on_incompatible_inputs():
+    from parquet_to_root import parquet_to_root
+    ROOT = pytest.importorskip("ROOT")
+    with pytest.raises(ValueError):
+        parquet_to_root(['tests/samples/HZZ.parquet','tests/samples/exoplanets.parquet'], 
+                         'HZZ.root', verbose=True)
+
+
+def test_cmdline_multiple_inputs():
+    ROOT = pytest.importorskip("ROOT")
+    import subprocess
+    chk = subprocess.run("python3 -m parquet_to_root tests/samples/HZZ.parquet tests/samples/HZZ.parquet HZZ.root -t newtree",
+                         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    print(chk.stdout)
+    chk.check_returncode()
+
+    rf = ROOT.TFile.Open('HZZ.root')
+    t = rf.Get('newtree')
+    assert t.GetEntries() == 4842
+    return True
+
+
+def test_cmdline_incompatible_inputs():
+    ROOT = pytest.importorskip("ROOT")
+    import subprocess
+    chk = subprocess.run("python3 -m parquet_to_root tests/samples/HZZ.parquet tests/samples/exoplanets.parquet HZZ.root -t newtree",
+                         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    print(chk.stdout)
+    with pytest.raises(subprocess.CalledProcessError):
+        chk.check_returncode()
+
+    return True
