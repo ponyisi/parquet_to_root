@@ -1,5 +1,7 @@
+import ROOT
+
+
 def _get_outfile(outfile):
-    import ROOT
     if isinstance(outfile, ROOT.TFile):
         outfile.cd()
         return outfile, False
@@ -34,7 +36,6 @@ def _check_type_in_map(dtype, msg):
 
 def _setup_branch_scalar(field, tree, numpybufs, stringvars):
     import numpy
-    import ROOT
     if field.type == 'string':
         stringvars.add(field.name)
         # dummy string
@@ -49,7 +50,6 @@ def _setup_branch_scalar(field, tree, numpybufs, stringvars):
 
 def _setup_branch_list(field, tree, vectorlens, stringarrs):
     import numpy
-    import ROOT
     if field.type.value_type == 'string':
         # vector of strings
         sv0 = ROOT.std.vector(ROOT.std.string)()
@@ -68,18 +68,18 @@ def _setup_branch_list(field, tree, vectorlens, stringarrs):
                     f'{field.name}[{field.name}_parquet_n]/{_dtypemap[field.type.value_type]}')
 
 
-def _do_fill(tree, entry, table, numpybufs, stringvars, vectorlens, stringarrs):
-    import ROOT
+
+def _do_fill(tree, entry, table, numpyzips, stringvars, vectorlens, stringarrs):
     ptrs = []
-    for branch in numpybufs:
-        numpybufs[branch][0] = table[branch][entry].as_py()
+    for target, source in numpyzips:
+        target[0] = source[entry]
     for branch in stringvars:
         s0 = ROOT.std.string(table[branch][entry].as_py())
         tree.SetBranchAddress(branch, s0)
         ptrs.append(s0)
-    for branch in vectorlens:
-        values_arrow = table[branch][entry]
-        vectorlens[branch][0] = len(values_arrow)
+    for branch, lentarget, source in vectorlens:
+        values_arrow = source[entry]
+        lentarget[0] = len(values_arrow)
         # Booleans don't work with zero copy but everything else should
         values = values_arrow.values.to_numpy(zero_copy_only=False)
         ptrs.append(values)
@@ -119,13 +119,13 @@ def parquet_to_root_pyroot(infiles, outfile, treename='parquettree',
                            verbose=False):
     import pyarrow.parquet as pq
     import pyarrow
-    import ROOT
 
     # Interpret files
     infiles, schema = normalize_parquet(infiles)
 
     fout, local_root_file_creation = _get_outfile(outfile)
     tree = ROOT.TTree(treename, 'Parquet tree')
+    tree.SetAutoSave(0)
 
     # Buffers for primitive types
     numpybufs = {}
@@ -154,9 +154,14 @@ def parquet_to_root_pyroot(infiles, outfile, treename='parquettree',
     # Fill loop
     for infile in infiles:
         table = pq.read_table(infile)
+        numpyzips = []
+        vectorzips = []
+        for branch, numpybuf in numpybufs.items():
+            numpyzips.append((numpybuf, table[branch].to_numpy()))
+        for branch, lenvec in vectorlens.items():
+            vectorzips.append((branch, lenvec, table[branch]))
         for entry in range(len(table)):
-            # trash on every pass through loop; just here to make sure nothing gets garbage collected early
-            _do_fill(tree, entry, table, numpybufs, stringvars, vectorlens, stringarrs)
+            _do_fill(tree, entry, table, numpyzips, stringvars, vectorzips, stringarrs)
 
     tree.Write()
     if local_root_file_creation:
