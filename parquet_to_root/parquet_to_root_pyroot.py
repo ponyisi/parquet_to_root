@@ -68,7 +68,6 @@ def _setup_branch_list(field, tree, vectorlens, stringarrs):
                     f'{field.name}[{field.name}_parquet_n]/{_dtypemap[field.type.value_type]}')
 
 
-
 def _do_fill(tree, entry, table, numpyzips, stringvars, vectorlens, stringarrs):
     ptrs = []
     for target, source in numpyzips:
