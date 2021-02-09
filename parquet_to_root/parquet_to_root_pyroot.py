@@ -101,7 +101,7 @@ def normalize_parquet(infiles):
     else:
         try:
             lfiles = list(infiles)
-        except TypeError:
+        except TypeError: # pragma: no cover
             # This really shouldn't be hit, but maybe there's an edge case
             lfiles = [infiles]
 
@@ -167,7 +167,7 @@ def parquet_to_root_pyroot(infiles, outfile, treename='parquettree',
         fout.Close()
 
 
-if __name__ == '__main__':
+if __name__ == '__main__': # pragma: no cover
     import sys
     import os
     foutname = os.path.basename(os.path.splitext(sys.argv[1])[0])+'.root'

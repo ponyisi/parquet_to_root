@@ -110,3 +110,17 @@ def test_cmdline_incompatible_inputs():
         chk.check_returncode()
 
     return True
+
+
+def test_unsupported_field_structure():
+    # Test that we raise a ValueError if the input structure is not a primitive or a list
+    from parquet_to_root import parquet_to_root
+    with pytest.raises(ValueError):
+        parquet_to_root('tests/samples/complex.parquet', 'dummy.root', verbose=True)
+
+
+def test_unsupported_field_type():
+    # Test that we raise a ValueError if we feed in an unsupported field type (timestamp)
+    from parquet_to_root import parquet_to_root
+    with pytest.raises(ValueError):
+        parquet_to_root('tests/samples/timestamps.parquet', 'dummy.root', verbose=True)
