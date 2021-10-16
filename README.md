@@ -17,3 +17,5 @@ To run from your script,
 where the default values are shown for the optional arguments.
 
 The `parquetfile` argument can either be a filename string or file-like object opened in binary mode. The `rootfile` argument can either be a filename string or an open `TFile`; if a string is provided any existing file will be overwritten, while if a `TFile` object is provided the new tree will be added to the existing file.
+
+This work was supported by the US Department of Energy, Office of Science, Office of High Energy Physics, under Award Number DE-SC0007890.
